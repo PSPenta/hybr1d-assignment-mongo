@@ -14,7 +14,8 @@ const userSchema = new Schema(
     },
     role: {
       type: String,
-      required: true
+      required: true,
+      default: 'buyer'
     },
     catalog: {
       type: Schema.Types.ObjectId,
