@@ -1,14 +1,12 @@
+/* eslint-disable no-underscore-dangle */
 const { StatusCodes } = require('http-status-codes');
-const { QueryTypes: { INSERT } } = require('sequelize');
+const { model } = require('mongoose');
 
-const sequelize = require('../config/dbConfig');
 const { response, checkIfDataExists } = require('../helpers/utils');
-
-const { model } = sequelize;
 
 exports.listOfSellers = async (req, res) => {
   try {
-    const sellers = await model('User').findAll({ where: { role: 'seller' }, attributes: ['id', 'username', 'role'] });
+    const sellers = await model('user').find({ role: 'seller' }, { _id: 1, username: 1, role: 1 });
     if (checkIfDataExists(sellers)) {
       return res.json(response(null, true, { sellers }));
     }
@@ -22,17 +20,20 @@ exports.listOfSellers = async (req, res) => {
 exports.sellerCatalog = async (req, res) => {
   try {
     if (checkIfDataExists(req.params.sellerId)) {
-      const seller = await model('User').findOne({ where: { id: req.params.sellerId } });
-      if (checkIfDataExists(seller)) {
-        const catalog = await model('Catalog').findOne({ where: { userId: req.params.sellerId } });
-        if (checkIfDataExists(catalog)) {
-          const products = await model('Product').findAll({ where: { catalogId: catalog.id }, attributes: ['id', 'name', 'price'] });
-          if (checkIfDataExists(products)) {
-            return res.json(response(null, true, { products }));
-          }
-          return res.status(StatusCodes.BAD_REQUEST).json(response('No products found!'));
+      const sellerCatalog = await model('user').findById(req.params.sellerId).populate({
+        path: 'catalog',
+        populate: {
+          path: 'products',
+          select: { _id: 1, name: 1, price: 1 }
         }
-        return res.status(StatusCodes.BAD_REQUEST).json(response('No catalog found for this seller!'));
+      });
+
+      if (
+        checkIfDataExists(sellerCatalog)
+        && checkIfDataExists(sellerCatalog.catalog)
+        && checkIfDataExists(sellerCatalog.catalog.products)
+      ) {
+        return res.json(response(null, true, { products: sellerCatalog.catalog.products }));
       }
       return res.status(StatusCodes.BAD_REQUEST).json(response('Invalid seller!'));
     }

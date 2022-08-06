@@ -1,3 +1,4 @@
+const { isValidObjectId } = require('mongoose');
 const router = require('express').Router();
 const { check, param } = require('express-validator');
 
@@ -68,8 +69,12 @@ router.get(
   [
     param('sellerId')
       .exists().withMessage('Seller is mandatory!')
-      .isInt({ min: 0, max: 99999999999 })
-      .withMessage('Invalid seller!')
+      .custom((value) => {
+        if (typeof value !== 'string' || !isValidObjectId(value)) {
+          throw new Error('Invalid seller!');
+        }
+        return true;
+      })
   ],
   dependencies.middlewares.requestValidator.validateRequest,
   dependencies.controllers.buyer.sellerCatalog
@@ -124,11 +129,23 @@ router.post(
   [
     param('sellerId')
       .exists().withMessage('Seller is mandatory!')
-      .isInt({ min: 0, max: 99999999999 })
-      .withMessage('Invalid seller!'),
+      .custom((value) => {
+        if (typeof value !== 'string' || !isValidObjectId(value)) {
+          throw new Error('Invalid seller!');
+        }
+        return true;
+      }),
     check('products')
       .exists().withMessage('Products are missing!')
       .isArray()
+      .custom(async (value) => {
+        await value.forEach((product) => {
+          if (typeof product !== 'string' || !isValidObjectId(product)) {
+            throw new Error('Invalid seller!');
+          }
+        });
+        return true;
+      })
       .withMessage('Invalid products!')
   ],
   dependencies.middlewares.requestValidator.validateRequest,
