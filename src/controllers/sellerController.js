@@ -1,21 +1,35 @@
+/* eslint-disable array-callback-return */
+/* eslint-disable no-underscore-dangle */
 const { StatusCodes } = require('http-status-codes');
+const { model } = require('mongoose');
 
-const { model } = require('../config/dbConfig');
 const { response, checkIfDataExists } = require('../helpers/utils');
 
 exports.createCatalog = async (req, res) => {
   try {
     if (req.userId) {
-      let catalog = await model('Catalog').findOne({ where: { userId: req.userId } });
+      let catalog = await model('catalog').findOne({ userId: req.userId });
       if (!checkIfDataExists(catalog)) {
-        catalog = await model('Catalog').create({ userId: req.userId });
+        catalog = await model('catalog').create({ userId: req.userId });
+        await model('user').findByIdAndUpdate(
+          req.userId,
+          { catalog: catalog._id.toString() },
+          { useFindAndModify: false }
+        );
       }
       await req.body.products.forEach(async (product) => {
-        await model('Product').create({
+        let newProduct = await model('product').create({
           name: product.name,
           price: product.price,
-          catalogId: catalog.id
+          catalogId: catalog._id.toString()
         });
+
+        await model('catalog').findByIdAndUpdate(
+          catalog._id.toString(),
+          { $push: { products: newProduct._id.toString() } },
+          { useFindAndModify: false }
+        );
+        newProduct = null;
       });
 
       if (catalog) {
@@ -33,13 +47,21 @@ exports.createCatalog = async (req, res) => {
 exports.allOrders = async (req, res) => {
   try {
     if (req.userId) {
-      const catalog = await model('Catalog').findOne({ where: { userId: req.userId } });
+      const catalog = await model('catalog').findOne({ userId: req.userId }).populate({
+        path: 'products',
+        populate: {
+          path: 'orders'
+        }
+      });
       if (checkIfDataExists(catalog)) {
-        const products = await model('Product').findAll({ where: { catalogId: catalog.id } });
-        if (checkIfDataExists(products)) {
-          const productIds = products.map((product) => product.id);
-
-          const orders = await model('OrderProducts').findAll({ where: { product_id: productIds } });
+        if (checkIfDataExists(catalog.products)) {
+          // eslint-disable-next-line consistent-return
+          const orders = catalog.products.filter((product) => {
+            if (checkIfDataExists(product.orders)) {
+              const orderIds = product.orders.map((order) => order._id);
+              return orderIds;
+            }
+          });
           if (checkIfDataExists(orders)) {
             return res.json(response(null, true, { orders }));
           }
