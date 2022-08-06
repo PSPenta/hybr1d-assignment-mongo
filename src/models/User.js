@@ -1,29 +1,42 @@
-const { paginate } = require('sequelize-paginate');
+const { Schema, model } = require('mongoose');
+const aggregatePaginate = require('mongoose-aggregate-paginate-v2');
 
-module.exports = (sequelize, Sequelize) => {
-  const User = sequelize.define('user', {
-    id: {
-      type: Sequelize.INTEGER,
-      autoIncrement: true,
-      allowNull: false,
-      primaryKey: true
-    },
+const userSchema = new Schema(
+  {
     username: {
-      type: Sequelize.STRING,
-      allowNull: false,
+      type: String,
+      required: true,
       unique: true
     },
     password: {
-      type: Sequelize.STRING,
-      allowNull: false
+      type: String,
+      required: true
     },
     role: {
-      type: Sequelize.STRING,
-      allowNull: false,
-      defaultValue: 'buyer'
-    }
-  });
+      type: String,
+      required: true
+    },
+    catalog: {
+      type: Schema.Types.ObjectId,
+      ref: 'catalog'
+    },
+    orders: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'order'
+      }
+    ],
+    blacklistedTokens: [
+      {
+        type: String,
+        required: true
+      }
+    ]
+  },
+  {
+    timestamps: true
+  }
+);
 
-  paginate(User);
-  return User;
-};
+userSchema.plugin(aggregatePaginate);
+module.exports = model('user', userSchema);

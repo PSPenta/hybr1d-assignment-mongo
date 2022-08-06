@@ -1,29 +1,32 @@
-const { paginate } = require('sequelize-paginate');
+const { Schema, model } = require('mongoose');
+const aggregatePaginate = require('mongoose-aggregate-paginate-v2');
 
-module.exports = (sequelize, Sequelize) => {
-  const Product = sequelize.define('product', {
-    id: {
-      type: Sequelize.INTEGER,
-      autoIncrement: true,
-      allowNull: false,
-      primaryKey: true
-    },
+const productSchema = new Schema(
+  {
     name: {
-      type: Sequelize.STRING,
-      allowNull: false
+      type: String,
+      required: true
     },
     price: {
-      type: Sequelize.FLOAT,
-      allowNull: false
+      type: Number,
+      required: true
     },
     catalogId: {
-      type: Sequelize.INTEGER,
-      allowNull: false,
-      model: 'catalogs',
-      key: 'id'
-    }
-  });
+      type: Schema.Types.ObjectId,
+      ref: 'catalog',
+      required: true
+    },
+    orders: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'order'
+      }
+    ]
+  },
+  {
+    timestamps: true
+  }
+);
 
-  paginate(Product);
-  return Product;
-};
+productSchema.plugin(aggregatePaginate);
+module.exports = model('product', productSchema);
