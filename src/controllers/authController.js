@@ -1,14 +1,14 @@
 const { compare, hash } = require('bcrypt');
 const { StatusCodes } = require('http-status-codes');
 const { sign } = require('jsonwebtoken');
+const { model } = require('mongoose');
 
-const { model } = require('../config/dbConfig');
 const { jwt } = require('../config/serverConfig');
 const { response, checkIfDataExists } = require('../helpers/utils');
 
 exports.jwtLogin = async (req, res) => {
   try {
-    const userData = await model('User').findOne({ where: { username: req.body.username } });
+    const userData = await model('user').findOne({ username: req.body.username });
     let token = '';
     if (
       checkIfDataExists(userData)
@@ -17,7 +17,8 @@ exports.jwtLogin = async (req, res) => {
       token = sign(
         {
           username: userData.username,
-          userId: userData.id.toString(),
+          // eslint-disable-next-line no-underscore-dangle
+          userId: userData._id.toString(),
           role: userData.role
         },
         jwt.secret,
@@ -39,10 +40,11 @@ exports.jwtLogout = async (req, res) => {
     if (req.headers.authorization) {
       const token = req.headers.authorization.split(' ')[1];
       if (token) {
-        await model('Blacklist').create({
-          token,
-          user: req.userId
-        });
+        model('user').findByIdAndUpdate(
+          req.userId,
+          { $push: { blacklistedTokens: token } },
+          { useFindAndModify: false }
+        );
       }
       return res.json(response(null, true, 'Successfully logged out!'));
     }
@@ -55,10 +57,10 @@ exports.jwtLogout = async (req, res) => {
 
 exports.register = async (req, res) => {
   try {
-    const data = await model('User').findOne({ where: { username: req.body.username } });
+    const data = await model('user').findOne({ username: req.body.username });
     if (!checkIfDataExists(data)) {
       const hashedPassword = await hash(req.body.password, 256);
-      const user = await model('User').create({
+      const user = await model('user').create({
         username: req.body.username,
         password: hashedPassword,
         role: req.body.role.toLowerCase()
