@@ -50,7 +50,8 @@ exports.allOrders = async (req, res) => {
       const catalog = await model('catalog').findOne({ userId: req.userId }).populate({
         path: 'products',
         populate: {
-          path: 'orders'
+          path: 'orders',
+          select: { _id: 1, userId: 1, products: 1 }
         }
       });
       if (checkIfDataExists(catalog)) {
