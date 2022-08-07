@@ -62,7 +62,7 @@ exports.allOrders = async (req, res) => {
               const orderIds = product.orders.map((order) => order._id);
               return orderIds;
             }
-          });
+          }).map((order) => order.orders);
           if (checkIfDataExists(orders)) {
             return res.json(response(null, true, { orders }));
           }
