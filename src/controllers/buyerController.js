@@ -47,21 +47,43 @@ exports.sellerCatalog = async (req, res) => {
 exports.createOrder = async (req, res) => {
   try {
     if (checkIfDataExists(req.params.sellerId) && checkIfDataExists(req.body.products)) {
-      const seller = await model('User').findOne({ where: { id: req.params.sellerId } });
-      if (checkIfDataExists(seller)) {
-        const catalog = await model('Catalog').findOne({ where: { userId: req.params.sellerId } });
-        if (checkIfDataExists(catalog)) {
-          const products = await model('Product').findAll({ where: { id: req.body.products } });
-          if (checkIfDataExists(products)) {
-            const order = await model('Order').create({ userId: req.userId });
-            await products.forEach(async (product) => {
-              // await order.addProduct(product);
-              // await model('OrderProducts').create({ order, product });
+      const sellerProducts = await model('user').findById(req.params.sellerId).populate({
+        path: 'catalog',
+        populate: {
+          path: 'products',
+          select: { _id: 1 }
+        }
+      });
+      if (checkIfDataExists(sellerProducts)) {
+        if (checkIfDataExists(sellerProducts.catalog)) {
+          if (checkIfDataExists(sellerProducts.catalog.products)) {
+            const orderedProducts = sellerProducts.catalog.products.filter((product) => {
+              if (req.body.products.includes(product._id.toString())) {
+                return true;
+              }
+              return false;
+            }).map((product) => (product._id.toString()));
 
-              // Using the raw query as the above functions are not working as expected.
-              await sequelize.default.query('INSERT INTO order_products (product_id, order_id) VALUES (?, ?)', { replacements: [product.id, order.id], type: INSERT });
+            const order = await model('order').create({
+              userId: req.userId
             });
-            return res.status(StatusCodes.CREATED).json(response(null, true, { message: 'Order created successfully!' }));
+            if (checkIfDataExists(order)) {
+              await model('order').findByIdAndUpdate(
+                order._id.toString(),
+                { $push: { products: orderedProducts } },
+                { useFindAndModify: false }
+              );
+
+              orderedProducts.forEach(async (product) => {
+                await model('product').findByIdAndUpdate(
+                  product,
+                  { $push: { orders: order._id.toString() } },
+                  { useFindAndModify: false }
+                );
+              });
+              return res.status(StatusCodes.CREATED).json(response(null, true, { message: 'Order created successfully!' }));
+            }
+            return res.status(StatusCodes.BAD_REQUEST).json(response('Unable to create the order!'));
           }
           return res.status(StatusCodes.BAD_REQUEST).json(response('No products found!'));
         }
